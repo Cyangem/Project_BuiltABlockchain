@@ -8,11 +8,13 @@ from backend.blockchain.blockchain import Blockchain
 from backend.pubsub import PubSub
 from backend.wallet.wallet import Wallet
 from backend.wallet.transaction import Transaction
+from backend.wallet.transaction_pool import TransactionPool
 
 app = Flask(__name__)
 blockchain = Blockchain()
 wallet = Wallet()
-pubsub = PubSub(blockchain)
+transaction_pool = TransactionPool()
+pubsub = PubSub(blockchain, transaction_pool)
 
 #get rid of dummy code
 # for i in range(3):
@@ -38,13 +40,23 @@ def route_blockchain_mine():
 def route_wallet_transact():
     # {'recipient': 'foo', 'amount':15}
     transaction_data = request.get_json() #dict
-    transaction = Transaction(
-        wallet,
-        transaction_data['recipient'],
-        transaction_data['amount']
+    transaction = transaction_pool.existing_transaction(wallet.address)
+    
+    if transaction:
+        transaction.update(
+            wallet,
+            transaction_data['recipient'],
+            transaction_data['amount']
+        )
+    else:
+        transaction = Transaction(
+            wallet,
+            transaction_data['recipient'],
+            transaction_data['amount']
     )
 
-    print(f'transaction.to_json(): {transaction.to_json()} ')
+    # print(f'transaction.to_json(): {transaction.to_json()} ')
+    pubsub.broadcast_transaction(transaction)
 
     return jsonify(transaction.to_json())
 
